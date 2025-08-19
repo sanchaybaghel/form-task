@@ -127,24 +127,26 @@ router.get('/form/:formId', async (req, res) => {
 });
 
 // Get dashboard analytics (overview of all forms)
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', (req, res) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   try {
     // Get total forms count
-    const totalForms = await Form.countDocuments();
-    const publishedForms = await Form.countDocuments({ 'settings.isPublished': true });
-    const draftForms = await Form.countDocuments({ 'settings.isPublished': false });
+    const totalForms = Form.countDocuments();
+    const publishedForms = Form.countDocuments({ 'settings.isPublished': true });
+    const draftForms = Form.countDocuments({ 'settings.isPublished': false });
 
     // Get total submissions across all forms
-    const totalSubmissions = await Submission.countDocuments();
+    const totalSubmissions = Submission.countDocuments();
 
     // Get forms with most submissions
-    const topForms = await Form.find()
+    const topForms = Form.find()
       .select('title analytics totalSubmissions')
       .sort({ 'analytics.totalSubmissions': -1 })
       .limit(5);
 
     // Get recent activity
-    const recentSubmissions = await Submission.find()
+    const recentSubmissions = Submission.find()
       .populate('formId', 'title')
       .sort({ 'metadata.submittedAt': -1 })
       .limit(10)
@@ -152,26 +154,28 @@ router.get('/dashboard', async (req, res) => {
 
     // Get submission trend for last 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const recentSubmissionsCount = await Submission.countDocuments({
+    const recentSubmissionsCount = Submission.countDocuments({
       'metadata.submittedAt': { $gte: sevenDaysAgo }
     });
 
-    const dashboard = {
-      overview: {
-        totalForms,
-        publishedForms,
-        draftForms,
-        totalSubmissions,
-        recentSubmissionsCount
-      },
-      topForms,
-      recentActivity: recentSubmissions.map(sub => ({
-        formTitle: sub.formId?.title || 'Unknown Form',
-        submittedAt: sub.metadata.submittedAt
-      }))
-    };
+    Promise.all([totalForms, publishedForms, draftForms, totalSubmissions, topForms, recentSubmissions, recentSubmissionsCount]).then(([totalForms, publishedForms, draftForms, totalSubmissions, topForms, recentSubmissions, recentSubmissionsCount]) => {
+      const dashboard = {
+        overview: {
+          totalForms,
+          publishedForms,
+          draftForms,
+          totalSubmissions,
+          recentSubmissionsCount
+        },
+        topForms,
+        recentActivity: recentSubmissions.map(sub => ({
+          formTitle: sub.formId?.title || 'Unknown Form',
+          submittedAt: sub.metadata.submittedAt
+        }))
+      };
 
-    res.json(dashboard);
+      res.json(dashboard);
+    });
   } catch (error) {
     console.error('Dashboard analytics error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard analytics' });
@@ -260,4 +264,4 @@ router.get('/form/:formId/field/:fieldId', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = router;

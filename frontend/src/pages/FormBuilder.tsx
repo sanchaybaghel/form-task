@@ -26,6 +26,11 @@ interface FormField {
   label: string
   placeholder?: string
   required: boolean
+  fileData?: {
+    base64: string
+    name: string
+    type: string
+  }
   validation?: {
     minLength?: number
     maxLength?: number
@@ -182,6 +187,19 @@ const FormBuilder = () => {
   }
 
   const saveForm = async () => {
+    // Frontend validation
+    if (!form.title || form.title.trim().length === 0 || form.title.length > 100) {
+      alert('Form title is required and must be less than 100 characters')
+      return
+    }
+
+    for (const field of form.fields) {
+      if (!field.label || field.label.trim().length === 0 || field.label.length > 100) {
+        alert(`Field label is required and must be less than 100 characters. Problematic field: ${field.label || '(empty)'}`)
+        return
+      }
+    }
+
     try {
       setSaving(true)
       
@@ -193,11 +211,11 @@ const FormBuilder = () => {
         return
       }
       
-      // Show success message
       alert('Form saved successfully!')
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save form:', error)
-      alert('Failed to save form')
+      const message = error.response?.data?.message || error.message || 'Unknown error'
+      alert(`Failed to save form: ${message}`)
     } finally {
       setSaving(false)
     }
@@ -439,9 +457,50 @@ const FormBuilder = () => {
                                     </div>
                                   )}
                                   {field.type === 'file' && (
-                                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                                    <div
+                                      className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
+                                      onClick={() => {
+                                        const fileInput = document.getElementById(`file-input-${field.id}`) as HTMLInputElement | null;
+                                        if (fileInput) {
+                                          fileInput.click();
+                                        }
+                                      }}
+                                    >
                                       <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                                       <p className="text-sm text-gray-600">Click to upload files</p>
+                                      <input
+                                        type="file"
+                                        id={`file-input-${field.id}`}
+                                        style={{ display: 'none' }}
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                          const files = e.target.files;
+                                          if (files && files.length > 0) {
+                                            const file = files[0];
+                                            const reader = new FileReader();
+                                            reader.onload = (event) => {
+                                              updateField(field.id, { 
+                                                fileData: {
+                                                  base64: event.target?.result as string,
+                                                  name: file.name,
+                                                  type: file.type
+                                                }
+                                              });
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }
+                                        }}
+                                      />
+                                      {field.fileData?.base64 && (
+                                        <div className="mt-2">
+                                          <img
+                                            src={field.fileData.base64}
+                                            alt="Uploaded preview"
+                                            className="mx-auto max-h-40"
+                                          />
+                                          <p className="text-xs text-gray-500 mt-1">{field.fileData.name}</p>
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                 </div>

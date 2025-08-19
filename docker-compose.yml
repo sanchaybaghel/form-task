@@ -7,14 +7,20 @@ services:
     container_name: form-builder-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
-      MONGO_INITDB_DATABASE: form-builder
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password123}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-form-builder}
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT:-27017}:27017"
     volumes:
       - mongodb_data:/data/db
       - ./backend/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     networks:
       - form-builder-network
 
@@ -26,20 +32,27 @@ services:
     container_name: form-builder-backend
     restart: unless-stopped
     environment:
-      NODE_ENV: production
-      PORT: 5000
-      MONGODB_URI: mongodb://admin:password123@mongodb:27017/form-builder?authSource=admin
-      FRONTEND_URL: http://localhost:3000
-      JWT_SECRET: your-super-secret-jwt-key-here-change-in-production
-      JWT_EXPIRE: 7d
-      FILE_UPLOAD_PATH: ./uploads
-      MAX_FILE_SIZE: 5242880
+      - NODE_ENV=production
+      - PORT=${BACKEND_PORT:-5000}
+      - MONGODB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-password123}@mongodb:27017/${MONGO_INITDB_DATABASE:-form-builder}?authSource=admin
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-here-change-in-production}
+      - JWT_EXPIRE=${JWT_EXPIRE:-7d}
+      - FILE_UPLOAD_PATH=./uploads
+      - MAX_FILE_SIZE=${MAX_FILE_SIZE:-5242880}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000}
     ports:
-      - "5000:5000"
+      - "${BACKEND_PORT:-5000}:5000"
     volumes:
       - ./backend/uploads:/app/uploads
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - form-builder-network
 
@@ -48,12 +61,23 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=/api
     container_name: form-builder-frontend
     restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=/api
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     networks:
       - form-builder-network
 

@@ -42,11 +42,139 @@ A complete form builder application built with the MERN stack (MongoDB, Express.
 
 ## Prerequisites
 
+### For Development
 - Node.js 16+ 
 - MongoDB 4.4+
 - npm or yarn
 
-## Installation
+### For Production (Docker)
+- Docker 20.10+
+- Docker Compose 2.0+
+
+## Quick Start
+
+### With Docker (Recommended)
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd form-builder
+   ```
+
+2. Copy the example environment file and update the values if needed:
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Start the application in production mode:
+   ```bash
+   ./start.sh prod
+   ```
+
+4. Access the application:
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:5000
+   - MongoDB: mongodb://localhost:27017/form-builder
+
+### Development Setup
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd form-builder
+   ```
+
+2. Install dependencies for both frontend and backend:
+   ```bash
+   # Install root dependencies
+   npm install
+   
+   # Install frontend dependencies
+   cd frontend
+   npm install
+   
+   # Install backend dependencies
+   cd ../backend
+   npm install
+   cd ..
+   ```
+
+3. Set up environment variables:
+   ```bash
+   # Copy example environment files
+   cp .env.example .env
+   cp backend/.env.example backend/.env
+   cp frontend/.env.example frontend/.env
+   ```
+
+4. Start the development servers:
+   ```bash
+   # Start both frontend and backend in development mode
+   npm run dev
+   ```
+
+## Docker Deployment
+
+### Prerequisites
+- Docker 20.10+
+- Docker Compose 2.0+
+
+### Configuration
+
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Update the environment variables in `.env` as needed.
+
+### Available Commands
+
+- Start in production mode:
+  ```bash
+  ./start.sh prod
+  ```
+
+- Start in development mode:
+  ```bash
+  ./start.sh dev
+  ```
+
+- Stop all services:
+  ```bash
+  ./start.sh stop
+  ```
+
+- View logs:
+  ```bash
+  docker-compose logs -f
+  ```
+
+### Environment Variables
+
+Key environment variables you might want to configure:
+
+```
+# MongoDB Configuration
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=your-strong-password
+MONGO_INITDB_DATABASE=form-builder
+
+# Backend Configuration
+BACKEND_PORT=5000
+JWT_SECRET=your-jwt-secret
+JWT_EXPIRE=7d
+MAX_FILE_SIZE=5242880  # 5MB
+
+# Frontend Configuration
+FRONTEND_PORT=3000
+REACT_APP_API_URL=/api
+
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:3000
+```
+
+## Manual Installation
 
 1. **Clone the repository**
    ```bash
