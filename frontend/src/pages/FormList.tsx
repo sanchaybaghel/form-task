@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import Modal from 'react-modal'
 import { Link } from 'react-router-dom'
 import { 
   Plus, 
@@ -14,7 +15,7 @@ import {
   Calendar,
   FileText
 } from 'lucide-react'
-import axios from 'axios'
+import backend from '../services/backend'
 
 interface Form {
   _id: string
@@ -27,6 +28,7 @@ interface Form {
     totalSubmissions: number
   }
   createdAt: string
+  fields?: any[] // <-- Add this line
 }
 
 const FormList = () => {
@@ -36,6 +38,24 @@ const FormList = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [showModal, setShowModal] = useState(false)
+  const [latestSubmission, setLatestSubmission] = useState<any>(null)
+  const [modalForm, setModalForm] = useState<Form | null>(null)
+  const handleViewLatestSubmission = async (form: Form) => {
+    try {
+      setLoading(true)
+      // Fetch latest submission for this form
+      const res = await backend.get(`/submissions/form/${form._id}?page=1&limit=1`)
+      const submission = res.data.submissions[0]
+      setLatestSubmission(submission)
+      setModalForm(form)
+      setShowModal(true)
+    } catch (error) {
+      alert('Failed to fetch latest submission')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     fetchForms()
@@ -57,7 +77,7 @@ const FormList = () => {
         params.append('status', statusFilter)
       }
 
-      const response = await axios.get(`/api/forms?${params}`)
+  const response = await backend.get(`/forms?${params}`)
       setForms(response.data.forms)
       setTotalPages(response.data.totalPages)
     } catch (error) {
@@ -70,7 +90,7 @@ const FormList = () => {
   const handleDelete = async (formId: string) => {
     if (window.confirm('Are you sure you want to delete this form?')) {
       try {
-        await axios.delete(`/api/forms/${formId}`)
+  await backend.delete(`/forms/${formId}`)
         fetchForms()
       } catch (error) {
         console.error('Failed to delete form:', error)
@@ -80,7 +100,7 @@ const FormList = () => {
 
   const handleDuplicate = async (formId: string) => {
     try {
-      await axios.post(`/api/forms/${formId}/duplicate`)
+  await backend.post(`/forms/${formId}/duplicate`)
       fetchForms()
     } catch (error) {
       console.error('Failed to duplicate form:', error)
@@ -89,7 +109,7 @@ const FormList = () => {
 
   const handlePublishToggle = async (formId: string, isPublished: boolean) => {
     try {
-      await axios.patch(`/api/forms/${formId}/publish`, {
+  await backend.patch(`/forms/${formId}/publish`, {
         isPublished: !isPublished
       })
       fetchForms()
@@ -240,6 +260,71 @@ const FormList = () => {
                           >
                             <Eye className="h-4 w-4" />
                           </Link>
+                          <button
+                            onClick={() => handleViewLatestSubmission(form)}
+                            className="text-green-600 hover:text-green-900"
+                            title="View Latest Submission"
+                          >
+                            <Users className="h-4 w-4" />
+                          </button>
+      {/* Modal for latest submission */}
+      <Modal
+        isOpen={showModal}
+        onRequestClose={() => setShowModal(false)}
+        contentLabel="Latest Submission"
+        ariaHideApp={false}
+        className="fixed inset-0 flex items-center justify-center z-50"
+        overlayClassName="fixed inset-0 bg-black bg-opacity-40 z-40"
+      >
+        <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full relative">
+          <button
+            onClick={() => setShowModal(false)}
+            className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+          >
+            &times;
+          </button>
+          <h2 className="text-xl font-bold mb-4">Latest Submission for: {modalForm?.title}</h2>
+          {latestSubmission ? (
+            <div className="space-y-4">
+              {modalForm?.fields?.map((field: any) => {
+                const fieldData = latestSubmission.data.find((d: any) => d.fieldId === field.id)
+                if (!fieldData) return null
+                return (
+                  <div key={field.id} className="border-l-4 border-blue-200 pl-3">
+                    <p className="font-medium text-gray-900">{field.label}</p>
+                    <div className="text-gray-600">
+                      {fieldData.files && fieldData.files.length > 0 ? (
+                        <>
+                          {fieldData.files.map((f: any, idx: number) => {
+                            const isImage = f.filename.match(/\.(png|jpg|jpeg|gif)$/i)
+                            const url = `${import.meta.env.VITE_BACKEND_URL?.replace('/api','') || 'http://localhost:4000'}/uploads/${f.filename}`
+                            return isImage ? (
+                              <img
+                                key={idx}
+                                src={url}
+                                alt={f.originalName}
+                                className="max-h-32 my-2 rounded border"
+                              />
+                            ) : (
+                              <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">
+                                {f.originalName}
+                              </a>
+                            )
+                          })}
+                        </>
+                      ) : (
+                        String(fieldData.value || '')
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p>No submissions found for this form.</p>
+          )}
+        </div>
+      </Modal>
                           <Link
                             to={`/forms/${form._id}/edit`}
                             className="text-indigo-600 hover:text-indigo-900"
@@ -314,4 +399,4 @@ const FormList = () => {
   )
 }
 
-export default FormList 
+export default FormList

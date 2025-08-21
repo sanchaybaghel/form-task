@@ -18,7 +18,7 @@ import {
   GripVertical,
   X
 } from 'lucide-react'
-import axios from 'axios'
+import backend from '../services/backend'
 
 interface FormField {
   id: string
@@ -105,7 +105,7 @@ const FormBuilder = () => {
   const fetchForm = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`/api/forms/${id}`)
+      const response = await backend.get(`/forms/${id}`)
       setForm(response.data)
     } catch (error) {
       console.error('Failed to fetch form:', error)
@@ -121,6 +121,9 @@ const FormBuilder = () => {
       label: `New ${fieldType} field`,
       required: false,
       order: form.fields.length,
+      placeholder: fieldType === 'text' ? 'Enter text here...' : 
+                  fieldType === 'email' ? 'Enter your email address...' :
+                  fieldType === 'textarea' ? 'Enter your message here...' : '',
       options: fieldType === 'select' || fieldType === 'radio' ? [
         { label: 'Option 1', value: 'option1' },
         { label: 'Option 2', value: 'option2' }
@@ -141,6 +144,11 @@ const FormBuilder = () => {
         field.id === fieldId ? { ...field, ...updates } : field
       )
     }))
+    
+    // Update selectedField if it's the one being updated
+    if (selectedField?.id === fieldId) {
+      setSelectedField(prev => prev ? { ...prev, ...updates } : null)
+    }
   }
 
   const deleteField = (fieldId: string) => {
@@ -204,9 +212,9 @@ const FormBuilder = () => {
       setSaving(true)
       
       if (id && id !== 'new') {
-        await axios.put(`/api/forms/${id}`, form)
+        await backend.put(`/forms/${id}`, form)
       } else {
-        const response = await axios.post('/api/forms', form)
+        const response = await backend.post('/forms', form)
         navigate(`/forms/${response.data._id}/edit`)
         return
       }
@@ -223,7 +231,7 @@ const FormBuilder = () => {
 
   const publishForm = async () => {
     try {
-      await axios.patch(`/api/forms/${id}/publish`, {
+      await backend.patch(`/forms/${id}/publish`, {
         isPublished: !form.settings.isPublished
       })
       
@@ -238,6 +246,30 @@ const FormBuilder = () => {
       alert(form.settings.isPublished ? 'Form unpublished' : 'Form published!')
     } catch (error) {
       console.error('Failed to update form status:', error)
+    }
+  }
+
+  const handleLabelChange = (fieldId: string, newLabel: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation()
+    updateField(fieldId, { label: newLabel })
+  }
+
+  const handleFileUpload = (fieldId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation()
+    const files = e.target.files
+    if (files && files.length > 0) {
+      const file = files[0]
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        updateField(fieldId, { 
+          fileData: {
+            base64: event.target?.result as string,
+            name: file.name,
+            type: file.type
+          }
+        })
+      }
+      reader.readAsDataURL(file)
     }
   }
 
@@ -391,39 +423,40 @@ const FormBuilder = () => {
                                 <input
                                   type="text"
                                   value={field.label}
-                                  onChange={(e) => updateField(field.id, { label: e.target.value })}
+                                  onChange={(e) => handleLabelChange(field.id, e.target.value, e)}
                                   className="w-full font-medium text-gray-900 bg-transparent border-none outline-none mb-2"
-                                  onClick={(e) => e.stopPropagation()}
+                                  onFocus={(e) => e.stopPropagation()}
                                 />
                                 
                                 {/* Field Preview */}
-                                <div className="mt-3">
+                                <div className="mt-3 pointer-events-none">
                                   {field.type === 'text' && (
                                     <input
                                       type="text"
                                       placeholder={field.placeholder || 'Enter text...'}
-                                      className="input w-full"
-                                      disabled
+                                      className="input w-full opacity-75"
+                                      readOnly
                                     />
                                   )}
                                   {field.type === 'email' && (
                                     <input
                                       type="email"
                                       placeholder={field.placeholder || 'Enter email...'}
-                                      className="input w-full"
-                                      disabled
+                                      className="input w-full opacity-75"
+                                      readOnly
                                     />
                                   )}
                                   {field.type === 'textarea' && (
                                     <textarea
                                       placeholder={field.placeholder || 'Enter text...'}
-                                      className="input w-full"
+                                      className="input w-full opacity-75"
                                       rows={3}
-                                      disabled
+                                      readOnly
                                     />
                                   )}
                                   {field.type === 'select' && (
-                                    <select className="input w-full" disabled>
+                                    <select className="input w-full opacity-75" disabled>
+                                      <option>Select an option...</option>
                                       {field.options?.map((option, idx) => (
                                         <option key={idx} value={option.value}>
                                           {option.label}
@@ -458,11 +491,12 @@ const FormBuilder = () => {
                                   )}
                                   {field.type === 'file' && (
                                     <div
-                                      className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer"
-                                      onClick={() => {
-                                        const fileInput = document.getElementById(`file-input-${field.id}`) as HTMLInputElement | null;
+                                      className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer pointer-events-auto"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        const fileInput = document.getElementById(`file-input-${field.id}`) as HTMLInputElement | null
                                         if (fileInput) {
-                                          fileInput.click();
+                                          fileInput.click()
                                         }
                                       }}
                                     >
@@ -473,30 +507,14 @@ const FormBuilder = () => {
                                         id={`file-input-${field.id}`}
                                         style={{ display: 'none' }}
                                         accept="image/*"
-                                        onChange={(e) => {
-                                          const files = e.target.files;
-                                          if (files && files.length > 0) {
-                                            const file = files[0];
-                                            const reader = new FileReader();
-                                            reader.onload = (event) => {
-                                              updateField(field.id, { 
-                                                fileData: {
-                                                  base64: event.target?.result as string,
-                                                  name: file.name,
-                                                  type: file.type
-                                                }
-                                              });
-                                            };
-                                            reader.readAsDataURL(file);
-                                          }
-                                        }}
+                                        onChange={(e) => handleFileUpload(field.id, e)}
                                       />
                                       {field.fileData?.base64 && (
                                         <div className="mt-2">
                                           <img
                                             src={field.fileData.base64}
                                             alt="Uploaded preview"
-                                            className="mx-auto max-h-40"
+                                            className="mx-auto max-h-40 rounded"
                                           />
                                           <p className="text-xs text-gray-500 mt-1">{field.fileData.name}</p>
                                         </div>
@@ -505,14 +523,16 @@ const FormBuilder = () => {
                                   )}
                                 </div>
                                 
-                                <div className="mt-3 flex items-center space-x-4">
+                                <div className="mt-3 flex items-center space-x-4 pointer-events-auto">
                                   <label className="flex items-center">
                                     <input
                                       type="checkbox"
                                       checked={field.required}
-                                      onChange={(e) => updateField(field.id, { required: e.target.checked })}
+                                      onChange={(e) => {
+                                        e.stopPropagation()
+                                        updateField(field.id, { required: e.target.checked })
+                                      }}
                                       className="h-4 w-4 text-blue-600"
-                                      onClick={(e) => e.stopPropagation()}
                                     />
                                     <span className="ml-2 text-sm text-gray-600">Required</span>
                                   </label>
@@ -563,14 +583,18 @@ const FormBuilder = () => {
                   {(selectedField.type === 'text' || selectedField.type === 'email' || selectedField.type === 'textarea') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Placeholder
+                        Placeholder Text
                       </label>
                       <input
                         type="text"
                         value={selectedField.placeholder || ''}
                         onChange={(e) => updateField(selectedField.id, { placeholder: e.target.value })}
                         className="input w-full"
+                        placeholder="Enter placeholder text here..."
                       />
+                      <p className="text-xs text-gray-500 mt-1">
+                        This text will appear as a hint in the input field
+                      </p>
                     </div>
                   )}
                   
@@ -609,7 +633,7 @@ const FormBuilder = () => {
                                 const newOptions = selectedField.options?.filter((_, idx) => idx !== index)
                                 updateField(selectedField.id, { options: newOptions })
                               }}
-                              className="text-red-600 hover:text-red-900"
+                              className="text-red-600 hover:text-red-900 p-2"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -750,4 +774,4 @@ const FormBuilder = () => {
   )
 }
 
-export default FormBuilder 
+export default FormBuilder

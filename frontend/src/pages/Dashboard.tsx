@@ -8,7 +8,7 @@ import {
   Eye,
   Plus
 } from 'lucide-react'
-import axios from 'axios'
+import backend from '../services/backend'
 
 interface DashboardStats {
   overview: {
@@ -38,7 +38,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
-        const response = await axios.get('/api/analytics/dashboard')
+  const response = await backend.get('/analytics/dashboard')
         setStats(response.data)
       } catch (error) {
         console.error('Failed to fetch dashboard stats:', error)
@@ -251,8 +251,9 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+     
     </div>
   )
 }
 
-export default Dashboard 
+export default Dashboard

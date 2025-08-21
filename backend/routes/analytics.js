@@ -127,55 +127,57 @@ router.get('/form/:formId', async (req, res) => {
 });
 
 // Get dashboard analytics (overview of all forms)
-router.get('/dashboard', (req, res) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+router.get('/dashboard', async (req, res) => {
   try {
-    // Get total forms count
-    const totalForms = Form.countDocuments();
-    const publishedForms = Form.countDocuments({ 'settings.isPublished': true });
-    const draftForms = Form.countDocuments({ 'settings.isPublished': false });
+    // Get total forms count and other data in parallel
+    const [
+      totalForms, 
+      publishedForms, 
+      draftForms, 
+      totalSubmissions, 
+      topForms, 
+      recentSubmissions, 
+      recentSubmissionsCount
+    ] = await Promise.all([
+      Form.countDocuments(),
+      Form.countDocuments({ 'settings.isPublished': true }),
+      Form.countDocuments({ 'settings.isPublished': false }),
+      Submission.countDocuments(),
+      Form.find()
+        .select('title analytics.totalSubmissions')
+        .sort({ 'analytics.totalSubmissions': -1 })
+        .limit(5)
+        .lean(),
+      Submission.find()
+        .populate('formId', 'title')
+        .sort({ 'metadata.submittedAt': -1 })
+        .limit(10)
+        .select('formId metadata.submittedAt')
+        .lean(),
+      // Get submission count for last 7 days
+      Submission.countDocuments({
+        'metadata.submittedAt': { 
+          $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
+        }
+      })
+    ]);
 
-    // Get total submissions across all forms
-    const totalSubmissions = Submission.countDocuments();
+    const dashboard = {
+      overview: {
+        totalForms,
+        publishedForms,
+        draftForms,
+        totalSubmissions,
+        recentSubmissionsCount
+      },
+      topForms,
+      recentActivity: recentSubmissions.map(sub => ({
+        formTitle: sub.formId?.title || 'Deleted Form',
+        submittedAt: sub.metadata?.submittedAt || new Date()
+      }))
+    };
 
-    // Get forms with most submissions
-    const topForms = Form.find()
-      .select('title analytics totalSubmissions')
-      .sort({ 'analytics.totalSubmissions': -1 })
-      .limit(5);
-
-    // Get recent activity
-    const recentSubmissions = Submission.find()
-      .populate('formId', 'title')
-      .sort({ 'metadata.submittedAt': -1 })
-      .limit(10)
-      .select('formId metadata.submittedAt');
-
-    // Get submission trend for last 7 days
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const recentSubmissionsCount = Submission.countDocuments({
-      'metadata.submittedAt': { $gte: sevenDaysAgo }
-    });
-
-    Promise.all([totalForms, publishedForms, draftForms, totalSubmissions, topForms, recentSubmissions, recentSubmissionsCount]).then(([totalForms, publishedForms, draftForms, totalSubmissions, topForms, recentSubmissions, recentSubmissionsCount]) => {
-      const dashboard = {
-        overview: {
-          totalForms,
-          publishedForms,
-          draftForms,
-          totalSubmissions,
-          recentSubmissionsCount
-        },
-        topForms,
-        recentActivity: recentSubmissions.map(sub => ({
-          formTitle: sub.formId?.title || 'Unknown Form',
-          submittedAt: sub.metadata.submittedAt
-        }))
-      };
-
-      res.json(dashboard);
-    });
+    res.json(dashboard);
   } catch (error) {
     console.error('Dashboard analytics error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard analytics' });

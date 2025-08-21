@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Upload, CheckCircle, AlertCircle } from 'lucide-react'
-import axios from 'axios'
+import backend from '../services/backend'
 
 interface FormField {
   id: string
@@ -50,7 +50,7 @@ const PublicForm = () => {
   const fetchForm = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`/api/forms/${id}/public`)
+  const response = await backend.get(`/forms/${id}/public`)
       setForm(response.data)
     } catch (error: any) {
       if (error.response?.status === 404) {
@@ -74,7 +74,7 @@ const PublicForm = () => {
     const formData = new FormData()
     files.forEach((file) => formData.append('files', file))
 
-    const res = await axios.post('/api/upload/multiple', formData, {
+  const res = await backend.post('/upload/multiple', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     return res.data.files || []
@@ -103,7 +103,7 @@ const PublicForm = () => {
         }
       }
 
-      await axios.post('/api/submissions', {
+  await backend.post('/submissions', {
         formId: form!.id,
         data: submissionData
       })
@@ -298,6 +298,28 @@ const PublicForm = () => {
                         {uploadedFiles[field.id].length} file(s) selected
                       </div>
                     )}
+
+                    {/* Show image preview if form data contains image file(s) for this field */}
+                    {(() => {
+                      // Try to get the value for this field from react-hook-form's watch
+                      const value = watch(field.id);
+                      // If value is an array (multiple files), map over it
+                      if (Array.isArray(value)) {
+                        return value.map((file: any, idx: number) => {
+                          if (typeof file === 'string' && (file.endsWith('.png') || file.endsWith('.jpg') || file.endsWith('.jpeg') || file.endsWith('.gif'))) {
+                            const url = `${import.meta.env.VITE_BACKEND_URL?.replace('/api','') || 'http://localhost:4000'}/uploads/${file}`;
+                            return <img key={idx} src={url} alt="Uploaded" className="max-h-32 my-2 rounded" />;
+                          }
+                          return null;
+                        });
+                      }
+                      // If value is a string (single file)
+                      if (typeof value === 'string' && (value.endsWith('.png') || value.endsWith('.jpg') || value.endsWith('.jpeg') || value.endsWith('.gif'))) {
+                        const url = `${import.meta.env.VITE_BACKEND_URL?.replace('/api','') || 'http://localhost:4000'}/uploads/${value}`;
+                        return <img src={url} alt="Uploaded" className="max-h-32 my-2 rounded" />;
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
                 

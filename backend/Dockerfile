@@ -1,46 +1,35 @@
-# Build stage
-FROM node:18-alpine AS builder
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies including devDependencies
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build the application
-RUN npm run build
-
 # Production stage
 FROM node:18-alpine
+
+# Install wget for healthcheck (if not already present)
+RUN apk add --no-cache wget
+
+# Create app directory and non-root user
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production
 
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+# Copy package files first (for better caching)
+COPY --chown=node:node package*.json ./
 
-# Copy necessary files
-COPY .env.example .env
-COPY tsconfig.json .
+# Install production dependencies
+RUN npm ci --only=production && npm cache clean --force
 
-# Create uploads directory
-RUN mkdir -p uploads
+# Copy source code with proper ownership
+COPY --chown=node:node . .
+
+# Create uploads directory with proper permissions
+RUN mkdir -p uploads && chown -R node:node uploads && chmod 755 uploads
+
+# Switch to non-root user
+USER node
 
 # Expose port
-EXPOSE 5000
+EXPOSE 4000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:4000/api/health || exit 1
 
 # Start the application
-CMD ["node", "dist/index.js"] 
+CMD ["node", "index.js"]

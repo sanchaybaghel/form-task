@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Download, Eye, Trash2, Calendar, Users } from 'lucide-react'
-import axios from 'axios'
+import backend from '../services/backend'
 
 interface Submission {
   _id: string
@@ -48,7 +48,7 @@ const FormSubmissions = () => {
 
   const fetchForm = async () => {
     try {
-      const response = await axios.get(`/api/forms/${id}`)
+  const response = await backend.get(`/forms/${id}`)
       setForm(response.data)
     } catch (error) {
       console.error('Failed to fetch form:', error)
@@ -58,7 +58,7 @@ const FormSubmissions = () => {
   const fetchSubmissions = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`/api/submissions/form/${id}?page=${currentPage}&limit=20`)
+  const response = await backend.get(`/submissions/form/${id}?page=${currentPage}&limit=20`)
       setSubmissions(response.data.submissions)
       setTotalPages(response.data.totalPages)
     } catch (error) {
@@ -71,7 +71,7 @@ const FormSubmissions = () => {
   const handleDelete = async (submissionId: string) => {
     if (window.confirm('Are you sure you want to delete this submission?')) {
       try {
-        await axios.delete(`/api/submissions/${submissionId}`)
+  await backend.delete(`/submissions/${submissionId}`)
         fetchSubmissions()
       } catch (error) {
         console.error('Failed to delete submission:', error)
@@ -81,7 +81,7 @@ const FormSubmissions = () => {
 
   const exportCSV = async () => {
     try {
-      const response = await axios.get(`/api/submissions/form/${id}/export`, {
+  const response = await backend.get(`/submissions/form/${id}/export`, {
         responseType: 'blob'
       })
       
@@ -302,10 +302,28 @@ const FormSubmissions = () => {
                       <div key={field.id} className="border-l-4 border-blue-200 pl-3">
                         <p className="font-medium text-gray-900">{field.label}</p>
                         <p className="text-gray-600">
-                          {fieldData.files && fieldData.files.length > 0
-                            ? fieldData.files.map(f => f.originalName).join(', ')
-                            : String(fieldData.value || '')
-                          }
+                          {fieldData.files && fieldData.files.length > 0 ? (
+                            <>
+                              {fieldData.files.map((f, idx) => {
+                                const isImage = f.filename.match(/\.(png|jpg|jpeg|gif)$/i);
+                                const url = `${import.meta.env.VITE_BACKEND_URL?.replace('/api','') || 'http://localhost:4000'}/uploads/${f.filename}`;
+                                return isImage ? (
+                                  <img
+                                    key={idx}
+                                    src={url}
+                                    alt={f.originalName}
+                                    className="max-h-32 my-2 rounded border"
+                                  />
+                                ) : (
+                                  <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="underline text-blue-600">
+                                    {f.originalName}
+                                  </a>
+                                );
+                              })}
+                            </>
+                          ) : (
+                            String(fieldData.value || '')
+                          )}
                         </p>
                       </div>
                     )

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { Download, Calendar, Users, TrendingUp } from 'lucide-react'
-import axios from 'axios'
+import backend from '../services/backend'
 
 interface Analytics {
   formId: string
@@ -38,7 +38,7 @@ const FormAnalytics = () => {
   const fetchAnalytics = async () => {
     try {
       setLoading(true)
-      const response = await axios.get(`/api/analytics/form/${id}?period=${period}`)
+  const response = await backend.get(`/analytics/form/${id}?period=${period}`)
       setAnalytics(response.data)
     } catch (error) {
       console.error('Failed to fetch analytics:', error)

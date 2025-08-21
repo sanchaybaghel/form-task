@@ -11,10 +11,20 @@
     "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "start": "cd backend && npm start"
   },
-  "keywords": ["mern", "form-builder", "react", "nodejs", "mongodb"],
+  "keywords": [
+    "mern",
+    "form-builder",
+    "react",
+    "nodejs",
+    "mongodb"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/react-modal": "^3.16.3",
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "react-modal": "^3.16.3"
   }
-} 
+}
