@@ -37,7 +37,7 @@ const corsOptions = {
   exposedHeaders: ['set-cookie']
 };
 
-app.use(cors(corsOptions));
+app.use(cors());
 
 // Handle preflight requests
 app.options('*', cors(corsOptions));
