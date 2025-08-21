@@ -23,7 +23,8 @@ app.use(helmet());
 // CORS configuration
 const corsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = [ 'https://form-task-delta.vercel.app/',
+    const allowedOrigins = [
+      'https://form-task-delta.vercel.app',
       'http://localhost:3001'
     ];
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
